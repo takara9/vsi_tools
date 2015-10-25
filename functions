@@ -1,0 +1,303 @@
+#!/bin/bash
+
+function display_vsi() {
+    printf "===========================================\n"
+    printf "DATACENTER :  %s\n" $DC_LOCATION
+    printf "DOMAINNAME :  %s\n" $DOMAIN
+    printf "HOSTNAME :    %s\n" $_HOSTNAME
+    printf "CPU Cores :   %d\n" $CORE
+    printf "RAM :         %d MB\n" $RAM
+    printf "Link Speed :  %d Mbps\n" $NIC
+    printf "OS :          %s\n" $OS
+    printf "Script URL:   %s\n" $POST_INSTALL_SCRIPT
+    printf "SSH-KEY ID:   %d\n" $SSHKEYID
+    printf "===========================================\n"
+}
+
+#
+# データセンターの選択
+#
+function dc_select() {
+    printf "\n"
+    printf "データセンターを選択してください\n"
+    options=("tok02" "sjc03" "hkg02")
+    select DC_LOCATION in "${options[@]}"
+    do
+	case $DC_LOCATION in
+	    "tok02" | "sjc03" | "hkg02")
+		return 
+		;;
+            *) echo invalid option;;
+	esac
+    done
+}
+
+#
+# CPUコア数の選択
+#
+function cpu_core_select() {
+    printf "\n"
+    printf "CPUコア数を選択してください\n"
+    options=( 1 2 4 )
+    select CORE in "${options[@]}"
+    do
+	case $CORE in
+	    1 | 2 | 4 )
+		return 
+		;;
+            *) echo invalid option;;
+	esac
+    done
+}
+
+#
+# メモリ搭載量の選択
+#
+function ram_select() {
+    printf "\n"
+    printf "RAM容量MBを選択してください\n"
+    options=( 1024 2048 4096 )
+    select RAM in "${options[@]}"
+    do
+	case $RAM in
+	    1024 | 2048 | 4096 )
+		return 
+		;;
+            *) echo invalid option;;
+	esac
+    done
+}
+
+#
+# リンク速度選択
+#
+function link_select() {
+    printf "\n"
+    printf "NICのリンク速度(Mbps)を選択してください\n"
+    options=( 10 100 1000 )
+    select NIC in "${options[@]}"
+    do
+	case $NIC in
+	    10 | 100 | 1000 )
+		return 
+		;;
+            *) echo invalid option;;
+	esac
+    done
+}
+
+#
+# OSとプロビジョニングスクリプト
+#
+function os_select() {
+    BASEURL="https://raw.githubusercontent.com/takara9/ProvisioningScript/master"
+    printf "\n"
+    printf "OSを選択してください\n"
+    options=( CENTOS_6_64 CENTOS_7_64 UBUNTU_14_64 DEBIAN_8_64 )
+    select OS in "${options[@]}"
+    do
+	case $OS in
+	    "CENTOS_6_64")
+		POST_INSTALL_SCRIPT="${BASEURL}/centos_basic_config"
+		return
+		;;
+	    "CENTOS_7_64")
+		POST_INSTALL_SCRIPT="${BASEURL}/centos_basic_config"
+		return
+		;;
+	    "UBUNTU_14_64")
+		POST_INSTALL_SCRIPT="${BASEURL}/ubuntu_basic_config"
+		return
+		;;
+	    "DEBIAN_8_64")
+		POST_INSTALL_SCRIPT="${BASEURL}/debian_basic_config"
+		return
+		;;
+            *) echo invalid option;;
+	esac
+    done
+}
+
+#
+# SSH鍵の選択
+#
+function sshkey_select() {
+    printf "\n"
+    printf "SSH KEY を選択してください\n"
+    work_label="/tmp/label_$BASHPID"
+    work_id="/tmp/id_$BASHPID"
+    truncate --size 0 $work_label
+    truncate --size 0 $work_id
+
+    slcli --format raw sshkey list --sortby id | while read line; do
+	a=( `echo $line` )
+	#echo ${a[0]} ${a[1]} 
+	printf "${a[0]} " >> $work_id
+	printf "${a[1]} " >> $work_label
+    done
+
+    ids=( `cat $work_id` )
+    labels=( `cat $work_label` )
+    rm -f $work_id
+    rm -f $work_label
+
+    printf "\n"
+    select label in "${labels[@]}"
+    do
+	i=0
+	for ilabel in "${labels[@]}"; do
+	    if [ "$label" == "$ilabel" ]; then
+		#echo ${ids[$i]} ${labels[$i]}
+		SSHKEYID=${ids[$i]}
+		KEYLABEL=${labels[$i]}
+		return
+	    fi
+	    let i++
+	done
+    done
+}
+
+#
+# Y/N インプット
+#
+function yn_input() {
+    MESSAGE=$1
+    
+    while [ true ];
+    do
+	read -p "$MESSAGE (y/n) " -n 1 INPUT
+	case $INPUT in
+	    "y") 
+		return 0
+		;;
+	    "n") 
+		return 1
+		;;
+
+	    *)
+		continue
+	esac
+    done
+}
+
+#
+# 先頭英字で始まる文字列のインプット処理
+# 引  数   最大半角文字数、文字列の名称
+# 戻り値   インプット結果
+#
+function string_input() {
+    MAXLEN=$1
+    STRINGNAME=$2
+    while [ true ];
+    do
+	printf "\n"
+	read -e -p "$STRINGNAME を $MAXLEN 文字以内でインプットしてください > " -n $MAXLEN INPUT
+	
+	if [ "$INPUT" == "" ]; then
+	    printf "$STRINGNAME のヌルは受け付けられません。\n"
+	    continue
+	elif [[ "$INPUT" =~ ^[a-zA-Z]+ ]]; then
+	    STRING=$INPUT
+	else
+	    printf "$STRINGNAME の先頭は a-z A-Z でなければなりません。\n"
+	    continue
+	fi
+	printf "\n"
+
+	yn_input "$STRINGNAME　は $STRING で正しいですか? "
+	if [ $? == 0 ]; then
+	    break
+	else
+	    continue
+	fi
+    done
+    printf "\n"
+    return 0
+}
+
+
+#
+# 起動、または、リフレッシュ
+#
+function create_or_restart_vsi() {
+    _HOSTNAME=$1
+    DOMAIN=$2
+    DC_LOCATION=$3
+    CORE=$4
+    RAM=$5
+    OS=$6
+    POST_INSTALL_SCRIPT=$7
+    SSHKEYID=$8
+    NIC=$9
+
+    VSREC=(`slcli --format raw vs list --columns id,hostname --hostname $_HOSTNAME`)
+    ID=${VSREC[0]}
+    if [ "$ID" == "" ]; then
+        # 新規オーダー
+	printf "ホスト名が存在しないので新規オーダー（作成）\n"
+	slcli --really --format raw \
+	    vs create \
+	    --hostname $_HOSTNAME \
+	    --domain $DOMAIN \
+	    --datacenter $DC_LOCATION \
+	    --cpu $CORE --memory $RAM \
+	    --billing hourly \
+	    --public \
+	    --os $OS \
+	    --postinstall $POST_INSTALL_SCRIPT \
+	    --key $SSHKEYID \
+	    --network $NIC
+    else
+	printf "同じホスト名の仮想サーバーが存在するので再ロード\n"
+	slcli --really \
+	    vs reload \
+	    --key $SSHKEYID \
+	    --postinstall $POST_INSTALL_SCRIPT \
+	    $ID
+    fi
+    
+    # 立ち上がり完了待ち
+    printf "\n処理中"
+    STATUS="NA"
+    until [ "$STATUS" == "READY" ]
+    do
+	VSREC=(`slcli --format raw vs list --columns id,hostname --hostname $_HOSTNAME`)
+	ID=${VSREC[0]}
+	if [ "$ID" != "" ]; then
+	    STATUS=`slcli vs ready $ID`
+	    printf "."
+	fi
+	sleep 5
+    done
+}
+
+#
+#
+#
+function dns_registration() {
+    _HOSTNAME=$1
+    DOMAIN=$2
+
+    # 仮想サーバーの情報取得
+    VSREC=(`slcli --format raw vs list --hostname $_HOSTNAME`)
+    VSID=${VSREC[0]}
+    PRIVATE_IP=${VSREC[3]}
+    if [ $VSID == "" ]; then
+	printf "Error, the private ip address does not exist.\n"
+	exit 1
+    fi
+
+    # DNSに同じIPアドレスが存在するかチェック、もし在ったら削除
+    # DNSに同じホスト名が存在するかチェック、もし在ったら削除
+    DNSREC=(`slcli --format raw dns record-list $DOMAIN --data $PRIVATE_IP`)
+    DNSID=${DNSREC[0]}
+    if [ "$DNSID" != "" ]; then
+        # 該当レコード削除
+	slcli --really --format raw dns record-remove $DNSID
+    elif [ "${DNSREC[0]}" != "" ]; then
+        # 該当レコード削除
+	slcli --really --format raw dns record-remove $DNSID
+    fi
+    # ホスト名とIPアドレスのDNS登録
+    slcli dns record-add $DOMAIN $_HOSTNAME A $PRIVATE_IP --ttl 900
+}

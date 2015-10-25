@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# SoftLayerで仮想サーバーのホスト名リストから、
+# 同じホスト名がある場合はOSを再ロード
+# 既存同一ホスト名が無い場合は、新規作成（オーダー）
+#
+#
+source functions
+
+PS3='メニュー番号を選択してください '
+options=( "dsp_vsi" "set_domain" "set_dc" "vsi_config" "set_hostname" "vsi_create" "vsi_cancel" "dns_list" "vsi_list" )
+
+select item in "${options[@]}"
+do
+    case $item in
+	"set_dc")
+	    dc_select
+	    ;;
+	"vsi_list")
+	    slcli vs list
+	    ;;
+	"set_domain")
+	    string_input 20 "ドメイン名"
+	    DOMAIN=$STRING
+	    ;;
+	"set_hostname")
+	    string_input 12 "仮想サーバー名"
+	    _HOSTNAME=$STRING
+	    ;;
+	"vsi_config")
+	    cpu_core_select
+	    ram_select
+	    link_select
+	    os_select
+	    sshkey_select
+	    ;;
+	"vsi_create")
+	    ;;
+	"vsi_cancel")
+	    ;;
+	"dns_list")
+	    ;;
+	"dsp_vsi")
+	    display_vsi
+	    ;;
+        *) echo invalid option
+	    ;;
+    esac
+
+done
+
+exit
+
+
+
+# 確認
+yn_input "これで良いですか?"
+if [ $? == 1 ]; then
+    printf "\n終了します\n"
+    exit 0
+fi
+
+# VSIを生成
+create_or_restart_vsi $_HOSTNAME $DOMAIN $DC_LOCATION $CORE $RAM $OS $POST_INSTALL_SCRIPT $SSHKEYID $NIC
+# DNSへ登録
+dns_registration $_HOSTNAME $DOMAIN 
+
+
+# === 結果表示 ===
+# 仮想サーバーのリスト
+slcli vs list --hostname $_HOSTNAME
+# ドメインの登録リスト
+slcli dns record-list $DOMAIN --record $_HOSTNAME
+
+
