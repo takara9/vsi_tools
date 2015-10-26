@@ -1,5 +1,25 @@
 #!/bin/bash
 
+#
+# 設定情報の書き出し
+#
+function save_easy_menu() {
+    CNFFILE="$HOME/.easy_menu"
+    echo "DC_LOCATION=$DC_LOCATION" > $CNFFILE
+    echo "DOMAIN=$DOMAIN" >> $CNFFILE
+    echo "_HOSTNAME=$_HOSTNAME" >> $CNFFILE 
+    echo "CORE=$CORE" >> $CNFFILE
+    echo "RAM=$RAM" >> $CNFFILE
+    echo "NIC=$NIC" >> $CNFFILE
+    echo "OS=$OS" >> $CNFFILE
+    echo "POST_INSTALL_SCRIPT=$POST_INSTALL_SCRIPT" >> $CNFFILE
+    echo "SSHKEYID=$SSHKEYID" >> $CNFFILE
+}
+
+
+#
+# 設定情報の表示
+#
 function display_vsi() {
     printf "===========================================\n"
     printf "DATACENTER :  %s\n" $DC_LOCATION
@@ -157,6 +177,46 @@ function sshkey_select() {
     done
 }
 
+
+#
+# サーバー選択リスト
+#
+function server_select() {
+    printf "\n"
+    printf "仮想サーバーを選択してください\n"
+    work_vsi_list="/tmp/vsi_id_$BASHPID"
+    work_vsi_id="/tmp/vsi_name_$BASHPID"
+    cat /dev/null > $work_vsi_list
+    cat /dev/null > $work_vsi_id
+
+    slcli --format raw vs list | while read line; do
+	a=( `echo $line` )
+	echo ${a[0]} ${a[1]} 
+	printf "${a[0]} " >> $work_vsi_id
+	printf "${a[1]} " >> $work_vsi_list
+    done
+    
+    vsi_id=( `cat $work_vsi_id` )
+    vsi_list=( `cat $work_vsi_list` )
+    rm -f $work_vsi_id
+    rm -f $work_vsi_list
+
+    printf "\n"
+    select name in "${vsi_list[@]}"
+    do
+	i=0
+	for iname in "${vsi_list[@]}"; do
+	    if [ "$name" == "$iname" ]; then
+		echo $name
+		echo $i ${vsi_id[$i]}
+		return
+	    fi
+	    let i++
+	done
+    done
+}
+
+
 #
 # Y/N インプット
 #
@@ -269,10 +329,11 @@ function create_or_restart_vsi() {
 	fi
 	sleep 5
     done
+    printf "\n完了\n"
 }
 
 #
-#
+# DNSへ登録
 #
 function dns_registration() {
     _HOSTNAME=$1
@@ -301,3 +362,5 @@ function dns_registration() {
     # ホスト名とIPアドレスのDNS登録
     slcli dns record-add $DOMAIN $_HOSTNAME A $PRIVATE_IP --ttl 900
 }
+
+

@@ -1,13 +1,18 @@
 #!/bin/bash
-
 source functions
+
+server_select
+
+
+
+
+
+
+exit
 
 sshkey_select
 printf "key label = %s\n" $KEYLABEL
 printf "key id    = %s\n" $KEYID
-
-exit
-
 
 cpu_core_select
 printf "Core = %s\n" $CORE
@@ -25,14 +30,10 @@ os_select
 printf "OS = %s\n" $OS
 printf "PS = %s\n" $POST_INSTALL_SCRIPT
 
-
-
-
 string_input 5 "サーバー名"
 printf "=======\n"
 printf "INPUT: %s\n" $STRING
 printf "=======\n"
-
 
 yn_input "これで良いですか?"
 if [ $? == 0 ]; then

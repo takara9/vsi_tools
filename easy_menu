@@ -6,9 +6,12 @@
 #
 #
 source functions
+source "$HOME/.easy_menu"
 
 PS3='メニュー番号を選択してください '
-options=( "dsp_vsi" "set_domain" "set_dc" "vsi_config" "set_hostname" "vsi_create" "vsi_cancel" "dns_list" "vsi_list" )
+options=( "set_domain" "set_dc" "set_hostname" "vsi_config" "vsi_create" "vsi_cancel" "dsp_vsi" "dns_list" "vsi_list" )
+
+display_vsi
 
 select item in "${options[@]}"
 do
@@ -35,10 +38,23 @@ do
 	    sshkey_select
 	    ;;
 	"vsi_create")
+	    yn_input "これで良いですか?"
+	    if [ $? == 1 ]; then
+		printf "\n中止します\n"
+		break
+	    fi
+	    printf "\n"
+            # VSIを生成
+	    create_or_restart_vsi $_HOSTNAME $DOMAIN $DC_LOCATION $CORE \
+		$RAM $OS $POST_INSTALL_SCRIPT $SSHKEYID $NIC
+            # DNSへ登録
+	    dns_registration $_HOSTNAME $DOMAIN 
 	    ;;
 	"vsi_cancel")
+	    
 	    ;;
 	"dns_list")
+	    slcli dns record-list $DOMAIN
 	    ;;
 	"dsp_vsi")
 	    display_vsi
@@ -46,30 +62,14 @@ do
         *) echo invalid option
 	    ;;
     esac
-
+    save_easy_menu
 done
 
-exit
 
 
 
-# 確認
-yn_input "これで良いですか?"
-if [ $? == 1 ]; then
-    printf "\n終了します\n"
-    exit 0
-fi
-
-# VSIを生成
-create_or_restart_vsi $_HOSTNAME $DOMAIN $DC_LOCATION $CORE $RAM $OS $POST_INSTALL_SCRIPT $SSHKEYID $NIC
-# DNSへ登録
-dns_registration $_HOSTNAME $DOMAIN 
 
 
-# === 結果表示 ===
-# 仮想サーバーのリスト
-slcli vs list --hostname $_HOSTNAME
-# ドメインの登録リスト
-slcli dns record-list $DOMAIN --record $_HOSTNAME
+
 
 
