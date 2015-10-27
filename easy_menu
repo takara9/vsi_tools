@@ -88,18 +88,22 @@ do
             # DNSへ登録
 	    dns_registration $_HOSTNAME $DOMAIN 
 	    ;;
+
 	"vsi_cancel")
 	    server_cancel
 	    printf "キャンセル要求が投入されました\n"
 	    ;;
+
 	"vsi_reload")
 	    reload_vsi
 	    printf "リロード要求が投入されました\n"
 	    ;;
+
 	"")
 	    printf "\n終了します\n"
 	    exit
 	    ;;
+
         *) echo invalid option
 	    ;;
     esac
