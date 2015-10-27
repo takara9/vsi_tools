@@ -26,6 +26,9 @@ SSH-KEY ID:   370981
 ```
 
 # 前提条件
+
+## slcli コマンド
+
 slcli コマンドがインストールされ設定されている必要があります。
 
 ```
@@ -74,6 +77,53 @@ slcliコマンドに、ユーザー名とパスワードが設定され、ポー
 そして、削除する際に、DNSから削除します。 
 このDNSサーバーに登録するために、予めゾーンを設定しておく必要があります。
 ソフトレイヤーのDNSゾーンの登録方法は、https://www.change-makers.jp/post/10346 を参照ねがいます。
+
+
+## SSH KEY の登録
+
+このツールは、パスワードによるログインではなく、SSH鍵によるログインを利用します。
+このため事前にSSH鍵が登録されている必要があります。登録方法は https://www.change-makers.jp/post/10302 にあります。
+それから
+
+```
+$ ssh-keygen -t rsa -f ~/key/takara1
+Generating public/private rsa key pair.
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /home/chef/key/takara1.
+Your public key has been saved in /home/chef/key/takara1.pub.
+The key fingerprint is:
+11:51:24:19:c4:56:0c:c1:83:70:14:4a:4c:79:33:3e chef@ChefWs
+The key's randomart image is:
++--[ RSA 2048]----+
+|   o+++*O@+      |
+|   .oo= *o.      |
+|    .o +..       |
+|      E  .       |
+|       .S        |
+|                 |
+|                 |
+|                 |
+|                 |
++-----------------+
+```
+コマンドラインからのSSH KEYの登録
+
+```
+$ slcli sshkey add -f takara1.pub takara1
+SSH key added: 11:51:24:19:c4:56:0c:c1:83:70:14:4a:4c:79:33:3e
+```
+
+登録結果の確認
+
+```
+$ slcli sshkey list
+:........:...........:.................................................:.......:
+:   id   :   label   :                   fingerprint                   : notes :
+:........:...........:.................................................:.......:
+: 395475 :  takara1  : 11:51:24:19:c4:56:0c:c1:83:70:14:4a:4c:79:33:3e :   -   :
+:........:...........:.................................................:.......:
+```
 
 
 # インストール
