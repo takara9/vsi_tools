@@ -21,7 +21,8 @@ function save_easy_menu() {
 # 設定情報の表示
 #
 function display_vsi() {
-    printf "===========================================\n"
+    printf "\n"
+    printf "= VSI CONFIG ==============================\n"
     printf "DATACENTER :  %s\n" $DC_LOCATION
     printf "DOMAINNAME :  %s\n" $DOMAIN
     printf "HOSTNAME :    %s\n" $_HOSTNAME
@@ -41,11 +42,15 @@ function dc_select() {
     printf "\n"
     printf "データセンターを選択してください\n"
     options=("tok02" "sjc03" "hkg02")
-    select DC_LOCATION in "${options[@]}"
+    select BUF in "${options[@]}"
     do
-	case $DC_LOCATION in
+	case $BUF in
 	    "tok02" | "sjc03" | "hkg02")
-		return 
+		DC_LOCATION=$BUF
+		return 0
+		;;
+	    "")
+		return 1
 		;;
             *) echo invalid option;;
 	esac
@@ -59,11 +64,15 @@ function cpu_core_select() {
     printf "\n"
     printf "CPUコア数を選択してください\n"
     options=( 1 2 4 )
-    select CORE in "${options[@]}"
+    select BUF in "${options[@]}"
     do
-	case $CORE in
+	case $BUF in
 	    1 | 2 | 4 )
-		return 
+		CORE=$BUF
+		return 0
+		;;
+	    "")
+		return 1
 		;;
             *) echo invalid option;;
 	esac
@@ -77,16 +86,21 @@ function ram_select() {
     printf "\n"
     printf "RAM容量MBを選択してください\n"
     options=( 1024 2048 4096 )
-    select RAM in "${options[@]}"
+    select BUF in "${options[@]}"
     do
-	case $RAM in
+	case $BUF in
 	    1024 | 2048 | 4096 )
-		return 
+		RAM=$BUF
+		return 0
+		;;
+	    "")
+		return 1
 		;;
             *) echo invalid option;;
 	esac
     done
 }
+
 
 #
 # リンク速度選択
@@ -95,11 +109,15 @@ function link_select() {
     printf "\n"
     printf "NICのリンク速度(Mbps)を選択してください\n"
     options=( 10 100 1000 )
-    select NIC in "${options[@]}"
+    select BUF in "${options[@]}"
     do
-	case $NIC in
+	case $BUF in
 	    10 | 100 | 1000 )
-		return 
+		NIC=$BUF
+		return 0
+		;;
+	    "")
+		return 1
 		;;
             *) echo invalid option;;
 	esac
@@ -114,22 +132,26 @@ function os_select() {
     printf "\n"
     printf "OSを選択してください\n"
     options=( CENTOS_6_64 CENTOS_7_64 UBUNTU_14_64 DEBIAN_8_64 )
-    select OS in "${options[@]}"
+    select BUF in "${options[@]}"
     do
-	case $OS in
+	case $BUF in
 	    "CENTOS_6_64")
+		OS=$BUF
 		POST_INSTALL_SCRIPT="${BASEURL}/centos_basic_config"
 		return
 		;;
 	    "CENTOS_7_64")
+		OS=$BUF
 		POST_INSTALL_SCRIPT="${BASEURL}/centos_basic_config"
 		return
 		;;
 	    "UBUNTU_14_64")
+		OS=$BUF
 		POST_INSTALL_SCRIPT="${BASEURL}/ubuntu_basic_config"
 		return
 		;;
 	    "DEBIAN_8_64")
+		OS=$BUF
 		POST_INSTALL_SCRIPT="${BASEURL}/debian_basic_config"
 		return
 		;;
@@ -177,7 +199,6 @@ function sshkey_select() {
     done
 }
 
-
 #
 # サーバー選択リスト
 #
@@ -191,7 +212,7 @@ function server_select() {
 
     slcli --format raw vs list | while read line; do
 	a=( `echo $line` )
-	echo ${a[0]} ${a[1]} 
+	#echo ${a[0]} ${a[1]} 
 	printf "${a[0]} " >> $work_vsi_id
 	printf "${a[1]} " >> $work_vsi_list
     done
@@ -207,15 +228,45 @@ function server_select() {
 	i=0
 	for iname in "${vsi_list[@]}"; do
 	    if [ "$name" == "$iname" ]; then
-		echo $name
-		echo $i ${vsi_id[$i]}
-		return
+		SELECTED_ID=${vsi_id[$i]}
+		SELECTED_NAME=$name
+		return 0
 	    fi
 	    let i++
 	done
+	return 1
     done
 }
 
+
+#
+# サーバーのキャセル DNSのレコード削除
+#
+function server_cancel() {
+    server_select
+    if [ $? == 1 ]; then
+	printf "\n"
+	return 0
+    fi
+    
+    printf "VSI ID = %s\n" $SELECTED_ID
+    printf "VSI NAME = %s\n" $SELECTED_NAME
+    yn_input "続行しますか？"
+    if [ $? != 0 ]; then
+	printf "\n"
+	return 0
+    fi
+
+    slcli  --really vs cancel $SELECTED_ID
+    slcli --format raw dns record-list $DOMAIN --record $SELECTED_NAME | while read line; do
+	a=( `echo $line` )
+	DOM_ID="${a[0]}"
+	if [ "$DOM_ID" != "" ]; then
+	    slcli --really dns record-remove $DOM_ID
+	fi
+    done
+    printf "\n"
+}
 
 #
 # Y/N インプット
@@ -233,12 +284,12 @@ function yn_input() {
 	    "n") 
 		return 1
 		;;
-
 	    *)
 		continue
 	esac
     done
 }
+
 
 #
 # 先頭英字で始まる文字列のインプット処理
@@ -251,18 +302,18 @@ function string_input() {
     while [ true ];
     do
 	printf "\n"
-	read -e -p "$STRINGNAME を $MAXLEN 文字以内でインプットしてください > " -n $MAXLEN INPUT
+	read -e -p "$STRINGNAME を $MAXLEN 文字以内でインプットしてください (NULL:終了) > " -n $MAXLEN INPUT
 	
 	if [ "$INPUT" == "" ]; then
 	    printf "$STRINGNAME のヌルは受け付けられません。\n"
-	    continue
+	    return 1
 	elif [[ "$INPUT" =~ ^[a-zA-Z]+ ]]; then
 	    STRING=$INPUT
 	else
 	    printf "$STRINGNAME の先頭は a-z A-Z でなければなりません。\n"
 	    continue
 	fi
-	printf "\n"
+	#printf "\n"
 
 	yn_input "$STRINGNAME　は $STRING で正しいですか? "
 	if [ $? == 0 ]; then
@@ -331,6 +382,37 @@ function create_or_restart_vsi() {
     done
     printf "\n完了\n"
 }
+
+#
+# VSI リロード
+#
+function reload_vsi() {
+    server_select
+    if [ $? == 1 ]; then
+	printf "\n"
+	return 0
+    fi
+
+    printf "\nリロード対象VSI ==============================\n"
+    printf "VSI ID:    %s\n" $SELECTED_ID
+    printf "VSI NAME:  %s\n" $SELECTED_NAME
+    printf "KEY-ID:    %s\n" $SSHKEYID
+    printf "PI-SCRIPT: %s\n" $POST_INSTALL_SCRIPT
+    printf "================================================\n"
+    printf "* 最初に指定したOSがリロードされ初期化されます\n"
+    yn_input "続行しますか？"
+    if [ $? != 0 ]; then
+	printf "\n"
+	return 0
+    fi
+    slcli --really \
+	vs reload \
+	--key $SSHKEYID \
+	--postinstall $POST_INSTALL_SCRIPT \
+	$SELECTED_ID
+    
+}
+
 
 #
 # DNSへ登録

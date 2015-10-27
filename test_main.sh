@@ -1,8 +1,31 @@
 #!/bin/bash
 source functions
 
-server_select
+PS3='メニュー番号を選択してください '
+DOMAIN="takara.org"
+server_cancel
+exit
 
+
+
+
+printf "VSI ID = %s\n" $SELECTED_ID
+printf "VSI NAME = %s\n" $SELECTED_NAME
+yn_input "続行しますか？"
+if [ $? == 0 ]; then
+    printf "\nOK\n"
+else
+    printf "\nNG\n"
+fi
+
+echo "slcli  --really vs cancel $SELECTED_ID"
+slcli --format raw dns record-list $DOMAIN --record $SELECTED_NAME | while read line; do
+    a=( `echo $line` )
+    DOM_ID="${a[0]}"
+    if [ $DOM_ID != "" ]; then
+	echo "slcli --really dns record-remove $DOM_ID"
+    fi
+done
 
 
 

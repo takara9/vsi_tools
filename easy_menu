@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 #
 # SoftLayerで仮想サーバーのホスト名リストから、
 # 同じホスト名がある場合はOSを再ロード
@@ -8,36 +8,76 @@
 source functions
 source "$HOME/.easy_menu"
 
-PS3='メニュー番号を選択してください '
-options=( "set_domain" "set_dc" "set_hostname" "vsi_config" "vsi_create" "vsi_cancel" "dsp_vsi" "dns_list" "vsi_list" )
+PS3='メニュー番号を選択してください (0:終了 RET:MENU再表示)  '
+options=( 
+    "show_vsi_config"
+    "show_vsi_list" 
+    "show_dns_record" 
+    "set_domain" 
+    "set_dc" 
+    "set_hostname" 
+    "set_vsi_config" 
+    "vsi_create" 
+    "vsi_reload" 
+    "vsi_cancel" )
 
 display_vsi
 
 select item in "${options[@]}"
 do
     case $item in
+	"show_vsi_list")
+	    slcli vs list
+	    ;;
+	"show_dns_record")
+	    slcli dns record-list $DOMAIN
+	    ;;
+	"show_vsi_config")
+	    display_vsi
+	    ;;
+
 	"set_dc")
 	    dc_select
 	    ;;
-	"vsi_list")
-	    slcli vs list
-	    ;;
+
 	"set_domain")
 	    string_input 20 "ドメイン名"
-	    DOMAIN=$STRING
+	    if [ $? == 0 ]; then
+		DOMAIN=$STRING
+	    fi
 	    ;;
 	"set_hostname")
 	    string_input 12 "仮想サーバー名"
-	    _HOSTNAME=$STRING
+	    if [ $? == 0 ]; then
+		_HOSTNAME=$STRING
+	    fi
 	    ;;
-	"vsi_config")
+	"set_vsi_config")
 	    cpu_core_select
+	    if [ $? == 1 ]; then
+		break
+	    fi
 	    ram_select
+	    if [ $? == 1 ]; then
+		break
+	    fi
 	    link_select
+	    if [ $? == 1 ]; then
+		break
+	    fi
 	    os_select
+	    if [ $? == 1 ]; then
+		break
+	    fi
 	    sshkey_select
+	    if [ $? == 1 ]; then
+		break
+	    fi
+	    display_vsi	    
 	    ;;
+
 	"vsi_create")
+	    display_vsi
 	    yn_input "これで良いですか?"
 	    if [ $? == 1 ]; then
 		printf "\n中止します\n"
@@ -51,13 +91,16 @@ do
 	    dns_registration $_HOSTNAME $DOMAIN 
 	    ;;
 	"vsi_cancel")
-	    
+	    server_cancel
+	    printf "キャンセル要求が投入されました\n"
 	    ;;
-	"dns_list")
-	    slcli dns record-list $DOMAIN
+	"vsi_reload")
+	    reload_vsi
+	    printf "リロード要求が投入されました\n"
 	    ;;
-	"dsp_vsi")
-	    display_vsi
+	"")
+	    printf "\n終了します\n"
+	    exit
 	    ;;
         *) echo invalid option
 	    ;;
