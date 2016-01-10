@@ -142,11 +142,12 @@ function os_select() {
 		;;
 	    "CENTOS_7_64")
 		OS=$BUF
-		POST_INSTALL_SCRIPT="${BASEURL}/centos_basic_config"
+		POST_INSTALL_SCRIPT="${BASEURL}/centos7_basic_config"
 		return
 		;;
 	    "UBUNTU_14_64")
 		OS=$BUF
+#		POST_INSTALL_SCRIPT="${BASEURL}/ubuntu_chef_config"
 		POST_INSTALL_SCRIPT="${BASEURL}/ubuntu_basic_config"
 		return
 		;;
